@@ -1,0 +1,150 @@
+stdlib:
+  utc_log: true
+  shell_esc: abort
+  restricted_shell: shell
+  shell_catch_exception: true
+  shell_history_length: 100
+  shell_prompt_func: default
+  shell_saved_results: 100
+  shell_strings: true
+
+kernel:
+  logger_level: debug
+  dist_auto_connect: never
+  inet_dist_use_interface: "::"
+  inet_dist_listen_min: 1024
+  inet_dist_listen_max: 65535
+  inetrc: /tmp/inetrc
+  net_setuptime: 1 min
+  net_ticktime: 30 sec
+  shutdown_timeout: 500 ms
+  sync_nodes_mandatory:
+    - a@localhost
+    - b@localhost
+  sync_nodes_optional:
+    - c@localhost
+  sync_nodes_timeout: 700 ms
+  start_distribution: true
+  start_dist_ac: true
+  start_boot_server: false
+  boot_server_slaves:
+    - 127.0.0.1
+  start_disk_log: false
+  start_pg2: false
+  start_timer: false
+  shell_history: enabled
+  shell_history_drop:
+    - "q()."
+    - "halt()."
+  shell_history_file_bytes: 1024000
+  shell_history_path: /tmp/erlang/history
+  shutdown_func:
+    module: erlang
+    function: halt
+  global_groups:
+    group1:
+      publish_type: normal
+      nodes:
+        - a@localhost
+        - b@localhost
+
+ssl:
+  protocol_version: tlsv1.2
+  dtls_protocol_version: dtlsv1.2
+  session_lifetime: 1 hour
+  session_cb: conf
+  session_cb_init_args: >-
+    [time, " [", level, "] ", pid, " ",
+     {logger_formatter, [[logger_formatter, title], ":", "\n"], []},
+     msg, "\n"]
+  session_cache_client_max: 1000
+  session_cache_server_max: 1000
+  ssl_pem_cache_clean: 2 min
+  internal_active_n: 1
+
+mnesia:
+  access_module: mnesia
+  auto_repair: true
+  allow_index_on_key: false
+  backup_module: mnesia_backup
+  debug: none
+  dir: /tmp/mnesia
+  dump_disc_copies_at_startup: true
+  dump_log_load_regulation: false
+  dump_log_time_threshold: 3 min
+  dump_log_update_in_place: true
+  dump_log_write_threshold: 1000
+  event_module: mnesia_event
+  extra_db_nodes:
+    - a@localhost
+    - b@localhost
+  ignore_fallback_at_startup: false
+  fallback_error_function:
+    module: erlang
+    function: halt
+  fold_chunk_size: 100
+  max_wait_for_decision: infinity
+  schema_location: opt_disc
+  core_dir: false
+  pid_sort_order: standard
+  no_table_loaders: 2
+  dc_dump_limit: 4
+  send_compressed: 0
+  schema: []
+
+crypto:
+  rand_cache_size: 1024
+  fips_mode: false
+
+sasl:
+  error_logger_mf_dir: false
+  error_logger_mf_maxbytes: 102400
+  error_logger_mf_maxfiles: 5
+  sasl_error_logger:
+    file: /tmp/sasl.log
+    modes:
+      read: false
+      write: true
+      append: false
+      exclusive: false
+      raw: false
+      binary: false
+      compressed: false
+      ram: false
+      sync: true
+      read_ahead: 4096
+      delayed_write:
+        size: 500
+        delay: 10 sec
+      encoding: utf8
+  errlog_type: progress
+  utc_log: true
+
+runtime_tools:
+  ttb_autostart_module: ttb_autostart
+
+odbc:
+  port_timeout: 5 sec
+
+os_mon:
+  start_cpu_sup: false
+  start_disksup: true
+  start_memsup: false
+  start_os_sup: false
+  memsup_system_only: false
+  memory_check_interval: 2 min
+  system_memory_high_watermark: 90%
+  process_memory_high_watermark: 80%
+  memsup_helper_timeout: 30 sec
+  disk_space_check_interval: 30 min
+  disk_almost_full_threshold: 70%
+  disksup_posix_only: true
+  os_sup_mfa:
+    module: os_sup
+    function: error_report
+    args: >-
+      [std_error]
+  os_sup_enable: true
+  os_sup_errortag: std_error
+  os_sup_own: /etc
+  os_sup_syslogconf: /etc/hosts
