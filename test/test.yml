@@ -14,7 +14,7 @@ kernel:
   inet_dist_use_interface: "::"
   inet_dist_listen_min: 1024
   inet_dist_listen_max: 65535
-  inetrc: /tmp/inetrc
+  inetrc: /etc/hosts
   net_setuptime: 1 min
   net_ticktime: 30 sec
   shutdown_timeout: 500 ms

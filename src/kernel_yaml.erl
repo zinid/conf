@@ -19,7 +19,7 @@
 -behaviour(conf).
 
 %% API
--export([options/0]).
+-export([validator/0]).
 %% Imported validators
 -import(yval, [enum/1, ip/0, int/2, file/0, timeout/1, timeout/2,
                bool/0, ipv4/0, atom/0, map/2, options/2, list/2,
@@ -28,36 +28,38 @@
 %%%===================================================================
 %%% API
 %%%===================================================================
--spec options() -> conf:validators().
-options() ->
-    #{dist_auto_connect => enum([never, once]),
-      global_groups => global_groups_validator(),
-      inet_dist_use_interface => ip(),
-      inet_dist_listen_min => int(0, 65535),
-      inet_dist_listen_max => int(0, 65535),
-      inet_parse_error_log => enum([silent]),
-      inetrc => conf_misc:to_string(file()),
-      net_setuptime => conf_misc:to_seconds(timeout(second)),
-      net_ticktime => conf_misc:to_seconds(timeout(second)),
-      shutdown_timeout => timeout(millisecond, infinity),
-      sync_nodes_mandatory => list(atom(), [unique]),
-      sync_nodes_optional => list(atom(), [unique]),
-      sync_nodes_timeout => timeout(millisecond, infinity),
-      start_distribution => bool(),
-      start_dist_ac => bool(),
-      start_boot_server => bool(),
-      boot_server_slaves => list(ipv4(), [unique]),
-      start_disk_log => bool(),
-      start_pg2 => bool(),
-      start_timer => bool(),
-      shell_history => enum([enabled, disabled]),
-      shell_history_drop => list(string(), [unique]),
-      shell_history_file_bytes => int(51200, infinity),
-      shell_history_path => conf_misc:to_string(directory(write)),
-      shutdown_func => conf_misc:modfun_validator(1),
-      logger_level => enum([all, emergency, alert, critical, error,
-                            warning, notice, info, debug, none]),
-      logger_sasl_compatible => bool()}.
+-spec validator() -> yval:validator().
+validator() ->
+    options(
+      #{dist_auto_connect => enum([never, once]),
+        global_groups => global_groups_validator(),
+        inet_dist_use_interface => ip(),
+        inet_dist_listen_min => int(0, 65535),
+        inet_dist_listen_max => int(0, 65535),
+        inet_parse_error_log => enum([silent]),
+        inetrc => conf_misc:to_string(file()),
+        net_setuptime => conf_misc:to_seconds(timeout(second)),
+        net_ticktime => conf_misc:to_seconds(timeout(second)),
+        shutdown_timeout => timeout(millisecond, infinity),
+        sync_nodes_mandatory => list(atom(), [unique]),
+        sync_nodes_optional => list(atom(), [unique]),
+        sync_nodes_timeout => timeout(millisecond, infinity),
+        start_distribution => bool(),
+        start_dist_ac => bool(),
+        start_boot_server => bool(),
+        boot_server_slaves => list(ipv4(), [unique]),
+        start_disk_log => bool(),
+        start_pg2 => bool(),
+        start_timer => bool(),
+        shell_history => enum([enabled, disabled]),
+        shell_history_drop => list(string(), [unique]),
+        shell_history_file_bytes => int(51200, infinity),
+        shell_history_path => conf_misc:to_string(directory(write)),
+        shutdown_func => conf_misc:modfun_validator(1),
+        logger_level => enum([all, emergency, alert, critical, error,
+                              warning, notice, info, debug, none]),
+        logger_sasl_compatible => bool()},
+      [unique]).
 
 %%%===================================================================
 %%% Internal functions

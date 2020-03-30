@@ -52,7 +52,7 @@ expect() ->
               {inet_dist_listen_max,65535},
               {inet_dist_listen_min,1024},
               {inet_dist_use_interface,{0,0,0,0,0,0,0,0}},
-              {inetrc,"/tmp/inetrc"},
+              {inetrc,"/etc/hosts"},
               {logger,[{handler,default,logger_std_h,
                         #{config => #{type => standard_io},
                           formatter =>

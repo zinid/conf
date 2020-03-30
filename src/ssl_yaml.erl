@@ -19,28 +19,30 @@
 -behaviour(conf).
 
 %% API
--export([options/0]).
+-export([validator/0]).
 %% Imported validators
--import(yval, [bool/0, enum/1, beam/0, timeout/1, list/1,
+-import(yval, [bool/0, enum/1, beam/0, timeout/1, list/1, options/2,
                 pos_int/0, int/2, term/0, and_then/2, any/0]).
 
 %%%===================================================================
 %%% API
 %%%===================================================================
--spec options() -> conf:validators().
-options() ->
+-spec validator() -> yval:validator().
+validator() ->
     Versions = ssl:versions(),
-    #{protocol_version => enum(proplists:get_value(available, Versions)),
-      dtls_protocol_version => enum(proplists:get_value(available_dtls, Versions)),
-      session_lifetime => conf_misc:to_seconds(timeout(second)),
-      session_cb => beam(),
-      session_cb_init_args => and_then(term(), list(any())),
-      session_cache_client_max => pos_int(),
-      session_cache_server_max => pos_int(),
-      ssl_pem_cache_clean => timeout(millisecond),
-      bypass_pem_cache => bool(),
-      alert_timeout => timeout(millisecond),
-      internal_active_n => int(-32768, 32767)}.
+    options(
+      #{protocol_version => enum(proplists:get_value(available, Versions)),
+        dtls_protocol_version => enum(proplists:get_value(available_dtls, Versions)),
+        session_lifetime => conf_misc:to_seconds(timeout(second)),
+        session_cb => beam(),
+        session_cb_init_args => and_then(term(), list(any())),
+        session_cache_client_max => pos_int(),
+        session_cache_server_max => pos_int(),
+        ssl_pem_cache_clean => timeout(millisecond),
+        bypass_pem_cache => bool(),
+        alert_timeout => timeout(millisecond),
+        internal_active_n => int(-32768, 32767)},
+      [unique]).
 
 %%%===================================================================
 %%% Internal functions

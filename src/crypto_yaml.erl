@@ -19,17 +19,19 @@
 -behaviour(conf).
 
 %% API
--export([options/0]).
+-export([validator/0]).
 %% Imported validators
--import(yval, [non_neg_int/0, bool/0]).
+-import(yval, [non_neg_int/0, bool/0, options/2]).
 
 %%%===================================================================
 %%% API
 %%%===================================================================
--spec options() -> conf:validators().
-options() ->
-    #{rand_cache_size => non_neg_int(),
-      fips_mode => bool()}.
+-spec validator() -> yval:validator().
+validator() ->
+    options(
+      #{rand_cache_size => non_neg_int(),
+        fips_mode => bool()},
+      [unique]).
 
 %%%===================================================================
 %%% Internal functions

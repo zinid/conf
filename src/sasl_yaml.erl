@@ -19,7 +19,7 @@
 -behaviour(conf).
 
 %% API
--export([options/0]).
+-export([validator/0]).
 %% Imported validators
 -import(yval, [bool/0, enum/1, directory/1, options/2, int/2,
                pos_int/0, file/1, and_then/2, either/2]).
@@ -27,14 +27,16 @@
 %%%===================================================================
 %%% API
 %%%===================================================================
--spec options() -> conf:validators().
-options() ->
-    #{sasl_error_logger => sasl_error_logger_validator(),
-      error_logger_mf_dir => either(false, conf_misc:to_string(directory(write))),
-      error_logger_mf_maxbytes => pos_int(),
-      error_logger_mf_maxfiles => int(1, 255),
-      errlog_type => enum([error, progress, all]),
-      utc_log => bool()}.
+-spec validator() -> yval:validator().
+validator() ->
+    options(
+      #{sasl_error_logger => sasl_error_logger_validator(),
+        error_logger_mf_dir => either(false, conf_misc:to_string(directory(write))),
+        error_logger_mf_maxbytes => pos_int(),
+        error_logger_mf_maxfiles => int(1, 255),
+        errlog_type => enum([error, progress, all]),
+        utc_log => bool()},
+      [unique]).
 
 %%%===================================================================
 %%% Internal functions

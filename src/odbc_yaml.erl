@@ -19,16 +19,18 @@
 -behaviour(conf).
 
 %% API
--export([options/0]).
+-export([validator/0]).
 %% Imported validators
--import(yval, [timeout/2]).
+-import(yval, [timeout/2, options/2]).
 
 %%%===================================================================
 %%% API
 %%%===================================================================
--spec options() -> conf:validators().
-options() ->
-    #{port_timeout => timeout(millisecond, infinity)}.
+-spec validator() -> yval:validator().
+validator() ->
+    options(
+      #{port_timeout => timeout(millisecond, infinity)},
+      [unique]).
 
 %%%===================================================================
 %%% Internal functions

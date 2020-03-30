@@ -19,19 +19,21 @@
 -behaviour(conf).
 
 %% API
--export([options/0]).
+-export([validator/0]).
 %% Imported validators
--import(yval, [beam/1]).
+-import(yval, [beam/1, options/2]).
 
 %%%===================================================================
 %%% API
 %%%===================================================================
--spec options() -> conf:validators().
-options() ->
-    #{ttb_autostart_module =>
-          beam([{write_config, 1},
-                {delete_config, 0},
-                {read_config, 0}])}.
+-spec validator() -> yval:validator().
+validator() ->
+    options(
+      #{ttb_autostart_module =>
+            beam([{write_config, 1},
+                  {delete_config, 0},
+                  {read_config, 0}])},
+      [unique]).
 
 %%%===================================================================
 %%% Internal functions

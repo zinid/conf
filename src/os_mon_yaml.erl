@@ -19,32 +19,35 @@
 -behaviour(conf).
 
 %% API
--export([options/0]).
+-export([validator/0]).
 %% Imported validators
--import(yval, [bool/0, timeout/1, atom/0, directory/0, file/0, percent/0]).
+-import(yval, [bool/0, timeout/1, atom/0, directory/0, file/0,
+               percent/0, options/2]).
 
 %%%===================================================================
 %%% API
 %%%===================================================================
--spec options() -> conf:validators().
-options() ->
-    #{start_cpu_sup => bool(),
-      start_disksup => bool(),
-      start_memsup => bool(),
-      start_os_sup => bool(),
-      memsup_system_only => bool(),
-      memory_check_interval => conf_misc:to_minutes(timeout(minute)),
-      system_memory_high_watermark => percent(),
-      process_memory_high_watermark => percent(),
-      memsup_helper_timeout => conf_misc:to_seconds(timeout(second)),
-      disk_space_check_interval => conf_misc:to_minutes(timeout(minute)),
-      disk_almost_full_threshold => percent(),
-      disksup_posix_only => bool(),
-      os_sup_mfa => conf_misc:mfa_validator(),
-      os_sup_enable => bool(),
-      os_sup_errortag => atom(),
-      os_sup_own => conf_misc:to_string(directory()),
-      os_sup_syslogconf => conf_misc:to_string(file())}.
+-spec validator() -> yval:validator().
+validator() ->
+    options(
+      #{start_cpu_sup => bool(),
+        start_disksup => bool(),
+        start_memsup => bool(),
+        start_os_sup => bool(),
+        memsup_system_only => bool(),
+        memory_check_interval => conf_misc:to_minutes(timeout(minute)),
+        system_memory_high_watermark => percent(),
+        process_memory_high_watermark => percent(),
+        memsup_helper_timeout => conf_misc:to_seconds(timeout(second)),
+        disk_space_check_interval => conf_misc:to_minutes(timeout(minute)),
+        disk_almost_full_threshold => percent(),
+        disksup_posix_only => bool(),
+        os_sup_mfa => conf_misc:mfa_validator(),
+        os_sup_enable => bool(),
+        os_sup_errortag => atom(),
+        os_sup_own => conf_misc:to_string(directory()),
+        os_sup_syslogconf => conf_misc:to_string(file())},
+      [unique]).
 
 %%%===================================================================
 %%% Internal functions

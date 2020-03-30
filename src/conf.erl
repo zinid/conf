@@ -28,11 +28,7 @@
 -type error_reason() :: {unsupported_application, atom()}.
 -type config() :: [{atom(), #{atom() => term()}}].
 
--callback options() -> yval:validators().
--callback defaults() -> #{atom() => term()}.
--callback required() -> [atom(),...].
-
--optional_callbacks([defaults/0, required/0]).
+-callback validator() -> yval:validator().
 
 %%%===================================================================
 %%% API
@@ -133,9 +129,10 @@ read_file(Path) ->
 -spec load_config(config()) -> ok.
 load_config(Config) ->
     NewConfig = lists:map(
-                  fun({App, Opts}) ->
-                          Defaults = default_options(callback_module(App)),
-                          {App, maps:to_list(maps:merge(Defaults, Opts))}
+                  fun({App, Opts}) when is_map(Opts) ->
+                          {App, maps:to_list(Opts)};
+                     ({App, Opts}) when is_list(Opts) ->
+                          {App, Opts}
                   end, Config),
     application:set_env(NewConfig, [{persistent, true}]).
 
@@ -147,9 +144,7 @@ create_validators(AppOpts) ->
               Mod = callback_module(App),
               case code:ensure_loaded(Mod) of
                   {module, Mod} ->
-                      Validators = Mod:options(),
-                      Required = required_options(Mod),
-                      Validator = yval:options(Validators, [unique, {return, map}|Required]),
+                      Validator = Mod:validator(),
                       {ok, Acc#{App => Validator}};
                   _ ->
                       {error, {unsupported_application, App}}
@@ -164,17 +159,3 @@ top_validator() ->
 -spec callback_module(atom()) -> module().
 callback_module(App) ->
     list_to_atom(atom_to_list(App) ++ "_yaml").
-
--spec required_options(module()) -> [{required, [atom()]}].
-required_options(Mod) ->
-    case erlang:function_exported(Mod, required, 0) of
-        true -> [{required, Mod:required()}];
-        false -> []
-    end.
-
--spec default_options(module()) -> #{atom() => term()}.
-default_options(Mod) ->
-    case erlang:function_exported(Mod, defaults, 0) of
-        true -> Mod:defaults();
-        false -> #{}
-    end.

@@ -19,23 +19,25 @@
 -behaviour(conf).
 
 %% API
--export([options/0]).
+-export([validator/0]).
 %% Imported validators
--import(yval, [non_neg_int/0, bool/0, enum/1, beam/0, either/2]).
+-import(yval, [non_neg_int/0, bool/0, enum/1, beam/0, either/2, options/2]).
 
 %%%===================================================================
 %%% API
 %%%===================================================================
--spec options() -> conf:validators().
-options() ->
-    #{utc_log => bool(),
-      shell_esc => enum([icl, abort]),
-      restricted_shell => beam(),
-      shell_catch_exception => bool(),
-      shell_history_length => non_neg_int(),
-      shell_prompt_func => either(default, conf_misc:modfun_validator(1)),
-      shell_saved_results => non_neg_int(),
-      shell_strings => bool()}.
+-spec validator() -> yval:validator().
+validator() ->
+    options(
+      #{utc_log => bool(),
+        shell_esc => enum([icl, abort]),
+        restricted_shell => beam(),
+        shell_catch_exception => bool(),
+        shell_history_length => non_neg_int(),
+        shell_prompt_func => either(default, conf_misc:modfun_validator(1)),
+        shell_saved_results => non_neg_int(),
+        shell_strings => bool()},
+      [unique]).
 
 %%%===================================================================
 %%% Internal functions
