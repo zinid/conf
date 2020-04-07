@@ -27,6 +27,7 @@
 
 -type error_reason() :: {unsupported_application, atom()}.
 -type config() :: [{atom(), #{atom() => term()}}].
+-type distance_cache() :: #{{string(), string()} => non_neg_integer()}.
 
 -callback validator() -> yval:validator().
 
@@ -84,10 +85,6 @@ config_change(_Changed, _New, _Removed) ->
 %%%===================================================================
 %%% Internal functions
 %%%===================================================================
--spec format_error(error_reason()) -> string().
-format_error({unsupported_application, App}) ->
-    "Erlang application '" ++ atom_to_list(App) ++ "' doesn't support YAML configuration".
-
 -spec read_file(file:filename_all()) -> {ok, config()} | {error, error_reason() | yval:error_reason()}.
 read_file(Path) ->
     case fast_yaml:decode_from_file(Path) of
@@ -102,7 +99,7 @@ read_file(Path) ->
                                     {ok, Config};
                                 {error, Reason, Ctx} ->
                                     logger:critical("Failed to load configuration from ~ts: ~ts",
-                                                    [Path, yval:format_error(Reason, Ctx)]),
+                                                    [Path, format_error(Reason, Ctx)]),
                                     {error, Reason}
                             end;
                         {error, Reason} = Err ->
@@ -112,7 +109,7 @@ read_file(Path) ->
                     end;
                 {error, Reason, Ctx} ->
                     logger:critical("Failed to load configuration from ~ts: ~ts",
-                                    [Path, yval:format_error(Reason, Ctx)]),
+                                    [Path, format_error(Reason, Ctx)]),
                     {error, Reason}
             end;
         {ok, []} ->
@@ -173,3 +170,86 @@ expand_env([$$|Env]) ->
     end;
 expand_env(Other) ->
     Other.
+
+%%%===================================================================
+%%% Formatters
+%%%===================================================================
+-spec format_error(error_reason()) -> string().
+format_error({unsupported_application, App}) ->
+    "Erlang application '" ++ atom_to_list(App) ++ "' doesn't support YAML configuration".
+
+-spec format_error(yval:error_reason(), yval:ctx()) -> string().
+format_error({bad_enum, Known, Bad}, Ctx) ->
+    format_ctx(Ctx) ++
+        format("Unexpected value: ~s. Did you mean '~s'? ~s",
+               [Bad, best_match(Bad, Known),
+                format_known("Possible values", Known)]);
+format_error({unknown_option, Known, Opt}, Ctx) ->
+    format_ctx(Ctx) ++
+        format("Unknown parameter: ~s. Did you mean '~s'? ~s",
+               [Opt, best_match(Opt, Known),
+                format_known("Available parameters", Known)]);
+format_error(Reason, Ctx) ->
+    yval:format_error(Reason, Ctx).
+
+format_ctx([]) ->
+    "";
+format_ctx(Ctx) ->
+    yval:format_ctx(Ctx) ++ ": ".
+
+-spec format(iodata(), list()) -> string().
+format(Fmt, Args) ->
+    lists:flatten(io_lib:format(Fmt, Args)).
+
+-spec format_known(string(), [atom() | binary() | string()]) -> iolist().
+format_known(_, Known) when length(Known) > 20 ->
+    "";
+format_known(Prefix, Known) ->
+    [Prefix, " are: ", format_join(Known)].
+
+-spec format_join([atom() | string() | binary()]) -> string().
+format_join([]) ->
+    "(empty)";
+format_join(L) ->
+    Strings = lists:map(fun to_string/1, L),
+    lists:join(", ", lists:sort(Strings)).
+
+-spec best_match(atom() | binary() | string(),
+                 [atom() | binary() | string()]) -> string().
+best_match(Pattern, []) ->
+    Pattern;
+best_match(Pattern, Opts) ->
+    String = to_string(Pattern),
+    {Ds, _} = lists:mapfoldl(
+                fun(Opt, Cache) ->
+                        SOpt = to_string(Opt),
+                        {Distance, Cache1} = ld(String, SOpt, Cache),
+                        {{Distance, SOpt}, Cache1}
+                end, #{}, Opts),
+    element(2, lists:min(Ds)).
+
+%% Levenshtein distance
+-spec ld(string(), string(), distance_cache()) -> {non_neg_integer(), distance_cache()}.
+ld([] = S, T, Cache) ->
+    {length(T), maps:put({S, T}, length(T), Cache)};
+ld(S, [] = T, Cache) ->
+    {length(S), maps:put({S, T}, length(S), Cache)};
+ld([X|S], [X|T], Cache) ->
+    ld(S, T, Cache);
+ld([_|ST] = S, [_|TT] = T, Cache) ->
+    try {maps:get({S, T}, Cache), Cache}
+    catch _:{badkey, _} ->
+            {L1, C1} = ld(S, TT, Cache),
+            {L2, C2} = ld(ST, T, C1),
+            {L3, C3} = ld(ST, TT, C2),
+            L = 1 + lists:min([L1, L2, L3]),
+            {L, maps:put({S, T}, L, C3)}
+    end.
+
+-spec to_string(atom() | binary() | string()) -> string().
+to_string(A) when is_atom(A) ->
+    atom_to_list(A);
+to_string(B) when is_binary(B) ->
+    binary_to_list(B);
+to_string(S) ->
+    S.
