@@ -19,7 +19,7 @@
   {vsn,          "0.1.0"},
   {modules,      []},
   {registered,   []},
-  {applications, [kernel, stdlib, fast_yaml]},
+  {applications, [kernel, stdlib, fast_yaml, yval]},
   {mod,          {conf, []}},
   {env,          []},
   {links,        []}
