@@ -35,7 +35,7 @@
 %%%===================================================================
 -spec load_file(file:filename_all()) -> ok | {error, error_reason() | yval:error_reason()}.
 load_file(Path) ->
-    case read_file(Path) of
+    case read_file(expand_path(Path)) of
         {ok, Config} ->
             load_config(Config);
         {error, _} = Err ->
@@ -102,26 +102,23 @@ read_file(Path) ->
                                     {ok, Config};
                                 {error, Reason, Ctx} ->
                                     logger:critical("Failed to load configuration from ~ts: ~ts",
-                                                    [filename:absname(Path),
-                                                     yval:format_error(Reason, Ctx)]),
+                                                    [Path, yval:format_error(Reason, Ctx)]),
                                     {error, Reason}
                             end;
                         {error, Reason} = Err ->
                             logger:critical("Failed to load configuration from ~ts: ~s",
-                                            [filename:absname(Path),
-                                             format_error(Reason)]),
+                                            [Path, format_error(Reason)]),
                             Err
                     end;
                 {error, Reason, Ctx} ->
                     logger:critical("Failed to load configuration from ~ts: ~ts",
-                                    [filename:absname(Path),
-                                     yval:format_error(Reason, Ctx)]),
+                                    [Path, yval:format_error(Reason, Ctx)]),
                     {error, Reason}
             end;
         {ok, []} ->
             {ok, []};
         {error, Reason} = Err ->
-            logger:critical("Failed to read YAML file '~ts': ~s",
+            logger:critical("Failed to read YAML file ~ts: ~s",
                             [Path, fast_yaml:format_error(Reason)]),
             Err
     end.
@@ -159,3 +156,20 @@ top_validator() ->
 -spec callback_module(atom()) -> module().
 callback_module(App) ->
     list_to_atom(atom_to_list(App) ++ "_yaml").
+
+-spec expand_path(file:filename_all()) -> file:filename_all().
+expand_path(Path) ->
+    filename:absname(
+      filename:join(
+        lists:map(fun expand_env/1, filename:split(Path)))).
+
+-spec expand_env(unicode:chardata()) -> unicode:chardata().
+expand_env(<<$$, _/binary>> = Env) ->
+    expand_env(binary_to_list(Env));
+expand_env([$$|Env]) ->
+    case os:getenv(Env) of
+        false -> [$$|Env];
+        Value -> Value
+    end;
+expand_env(Other) ->
+    Other.

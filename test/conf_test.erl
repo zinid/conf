@@ -37,8 +37,7 @@ test_file() ->
     filename:join(test_dir(), "test.yml").
 
 test_dir() ->
-    {ok, Cwd} = file:get_cwd(),
-    filename:join([filename:dirname(Cwd), "conf", "test"]).
+    filename:join(["$PWD", "test"]).
 
 apps() ->
     [stdlib, kernel, ssl, mnesia, crypto,
