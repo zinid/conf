@@ -13,6 +13,7 @@ for processing JSON configuration files as well.
 
 ## Table of contents
 - [Usage](#usage)
+  - [Configuration reload](#configuration-reload)
 - [Dependencies](#dependencies)
 - [conf behaviour](#conf-behaviour)
   - [Example](#example)
@@ -81,6 +82,27 @@ parameter of `my_app.app.src` file as:
 ```
 **NOTE**: Since the library only loads environment variables, their values are accessible
 as usual via `application:get_env/2,3` functions.
+
+### Configuration reload
+
+Once the configuration file is loaded, you can use `conf:reload_file/0` to reload it:
+```erl
+-spec reload_file() -> ok | {error, error_reason()}.
+```
+The function loads configuration from the file defined in environment variable `file`.
+On success it also applies `config_change/3` callback for the applications which
+export it. The function is atomic in the sense that it only loads configuration if
+it's valid. However, configuration change of loaded applications may fail because
+`config_change/3` callback may fail for some applications.
+
+The function returns `ok` if the configuration can be read and is valid, no matter whether
+configuration change of loaded aplications has failed or not (however, warnings are
+reported in this case). If the configuration cannot be read or is invalid,
+`{error, Reason}` is returned. You can use function `conf:format_error/1` to print
+the `Reason` in a human readable format:
+```erl
+-spec format_error(error_reason()) -> string().
+```
 
 ## Dependencies
 
