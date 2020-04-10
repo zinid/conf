@@ -41,7 +41,7 @@ validator() ->
 %%%===================================================================
 %%% Internal functions
 %%%===================================================================
--spec sasl_error_logger_validator() -> conf:validator().
+-spec sasl_error_logger_validator() -> yval:validator().
 sasl_error_logger_validator() ->
     either(
       enum([false, tty]),

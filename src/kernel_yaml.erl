@@ -64,7 +64,7 @@ validator() ->
 %%%===================================================================
 %%% Internal functions
 %%%===================================================================
--spec global_groups_validator() -> conf:validator().
+-spec global_groups_validator() -> yval:validator().
 global_groups_validator() ->
     and_then(
       map(atom(),
