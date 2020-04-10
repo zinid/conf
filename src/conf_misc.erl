@@ -30,19 +30,19 @@
 %%%===================================================================
 %%% API
 %%%===================================================================
--spec to_seconds(conf:validator()) -> conf:validator(pos_integer()).
+-spec to_seconds(yval:validator()) -> yval:validator(pos_integer()).
 to_seconds(F) ->
     and_then(F, fun(T) -> T div 1000 end).
 
--spec to_minutes(conf:validator()) -> conf:validator(pos_integer()).
+-spec to_minutes(yval:validator()) -> yval:validator(pos_integer()).
 to_minutes(F) ->
     and_then(F, fun(T) -> T div 60000 end).
 
--spec to_string(conf:validator()) -> conf:validator(string()).
+-spec to_string(yval:validator()) -> yval:validator(string()).
 to_string(F) ->
     and_then(F, fun binary_to_list/1).
 
--spec modfun_validator(non_neg_integer()) -> conf:validator({module(), atom()}).
+-spec modfun_validator(non_neg_integer()) -> yval:validator({module(), atom()}).
 modfun_validator(Arity) ->
     and_then(
       options(
@@ -54,7 +54,7 @@ modfun_validator(Arity) ->
               {Mod, Fun}
       end).
 
--spec mfa_validator() -> conf:validator({module(), atom(), list()}).
+-spec mfa_validator() -> yval:validator({module(), atom(), list()}).
 mfa_validator() ->
     and_then(
       options(
@@ -69,7 +69,7 @@ mfa_validator() ->
               {Mod, Fun, Args}
       end).
 
--spec file_modes_validator() -> conf:validator([file:mode()]).
+-spec file_modes_validator() -> yval:validator([file:mode()]).
 file_modes_validator() ->
     and_then(
       options(

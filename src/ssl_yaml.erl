@@ -22,17 +22,21 @@
 -export([validator/0]).
 %% Imported validators
 -import(yval, [bool/0, enum/1, beam/0, timeout/1, list/1, options/2,
-                pos_int/0, int/2, term/0, and_then/2, any/0]).
+               pos_int/0, int/2, term/0, and_then/2, list_or_single/2,
+               any/0]).
 
 %%%===================================================================
 %%% API
 %%%===================================================================
 -spec validator() -> yval:validator().
 validator() ->
-    Versions = ssl:versions(),
     options(
-      #{protocol_version => enum(proplists:get_value(available, Versions)),
-        dtls_protocol_version => enum(proplists:get_value(available_dtls, Versions)),
+      #{protocol_version =>
+            list_or_single(
+              enum(['tlsv1.3', 'tlsv1.2', 'tlsv1.1', tlsv1, sslv3]),
+              [unique]),
+        dtls_protocol_version =>
+            list_or_single(enum(['dtlsv1.2', dtlsv1]), [unique]),
         session_lifetime => conf_misc:to_seconds(timeout(second)),
         session_cb => beam(),
         session_cb_init_args => and_then(term(), list(any())),

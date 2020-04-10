@@ -85,7 +85,8 @@ config_change(_Changed, _New, _Removed) ->
 %%%===================================================================
 %%% Internal functions
 %%%===================================================================
--spec read_file(file:filename_all()) -> {ok, config()} | {error, error_reason() | yval:error_reason()}.
+-spec read_file(file:filename_all()) -> {ok, config()} |
+                                        {error, error_reason() | yval:error_reason()}.
 read_file(Path) ->
     case fast_yaml:decode_from_file(Path) of
         {ok, [Y]} ->

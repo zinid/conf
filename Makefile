@@ -1,4 +1,8 @@
 REBAR ?= rebar3
+PROJECT := conf
+BUILD_IMAGE  ?= gitlab.bdt.tools:5000/build-ubuntu1804:1.4.2
+
+.PHONY: compile clean distclean test xref dialyzer dialyze linter lint
 
 all: compile
 
@@ -21,4 +25,16 @@ xref:
 dialyzer:
 	@$(REBAR) dialyzer
 
-.PHONY: compile dialyzer clean distclean test cover xref
+dialyze:
+	@$(REBAR) dialyzer
+
+linter:
+	@$(REBAR) as lint lint
+
+lint:
+	@$(REBAR) as lint lint
+
+.PHONY: d_%
+
+d_%:
+	./build-with-env --image $(BUILD_IMAGE) make $*
