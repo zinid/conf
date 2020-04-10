@@ -23,6 +23,7 @@
 -export([stop/0]).
 -export([load_file/1]).
 -export([reload_file/0]).
+-export([get_path/0]).
 -export([format_error/1]).
 %% Application callbacks
 -export([start/2, stop/1, config_change/3]).
@@ -48,6 +49,15 @@ reload_file() ->
         {ok, Path0} ->
             Path = conf_file:expand_path(Path0),
             read_and_load_file(Path, true);
+        {error, _} = Err ->
+            Err
+    end.
+
+-spec get_path() -> {ok, file:filename_all()} | {error, error_reason()}.
+get_path() ->
+    case get_env_file() of
+        {ok, Path} ->
+            {ok, conf_file:expand_path(Path)};
         {error, _} = Err ->
             Err
     end.
