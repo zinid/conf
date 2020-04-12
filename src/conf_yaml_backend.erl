@@ -14,70 +14,67 @@
 %%% limitations under the License.
 %%%
 %%%-------------------------------------------------------------------
--module(conf_file).
+-module(conf_yaml_backend).
 
 %% API
 -export([read_file/1]).
--export([expand_path/1]).
+-export([validate/1]).
 -export([format_error/1]).
--export_type([error_reason/0, apps_config/0]).
+-export_type([error_reason/0]).
 
 -type error_reason() :: {unsupported_application, atom()} |
-                        {invalid_config, yval:error_reason(), yval:ctx()} |
+                        {invalid_yaml_config, yval:error_reason(), yval:ctx()} |
                         {bad_yaml, term()}.
--type apps_config() :: [{atom(), #{atom() => term()} | {atom(), term()}}].
 -type distance_cache() :: #{{string(), string()} => non_neg_integer()}.
 
 %%%===================================================================
 %%% API
 %%%===================================================================
--spec read_file(file:filename_all()) -> {ok, apps_config()} | {error, error_reason()}.
+-spec read_file(file:filename_all()) -> {ok, term()} | {error, {bad_yaml, term()}}.
 read_file(Path) ->
     case fast_yaml:decode_from_file(Path) of
         {ok, [Y]} ->
-            case yval:validate(top_validator(), Y) of
-                {ok, AppOpts} ->
-                    case create_validators(AppOpts) of
-                        {ok, Validators} ->
-                            Validator = yval:options(Validators),
-                            case yval:validate(Validator, AppOpts) of
-                                {ok, Config} ->
-                                    {ok, Config};
-                                {error, Reason, Ctx} ->
-                                    {error, {invalid_config, Reason, Ctx}}
-                            end;
-                        {error, _} = Err ->
-                            Err
-                    end;
-                {error, Reason, Ctx} ->
-                    {error, {invalid_config, Reason, Ctx}}
-            end;
+            {ok, Y};
         {ok, []} ->
             {ok, []};
         {error, Reason} ->
             {error, {bad_yaml, Reason}}
     end.
 
--spec expand_path(file:filename_all()) -> file:filename_all().
-expand_path(Path) ->
-    filename:absname(
-      filename:join(
-        lists:map(fun expand_env/1, filename:split(Path)))).
+-spec validate(term()) -> {ok, conf:apps_config()} | {error, error_reason()}.
+validate(Y) ->
+    case yval:validate(top_validator(), Y) of
+        {ok, AppOpts} ->
+            case create_validators(AppOpts) of
+                {ok, Validators} ->
+                    Validator = yval:options(Validators),
+                    case yval:validate(Validator, AppOpts) of
+                        {ok, Config} ->
+                            {ok, Config};
+                        {error, Reason, Ctx} ->
+                            {error, {invalid_yaml_config, Reason, Ctx}}
+                    end;
+                {error, _} = Err ->
+                    Err
+            end;
+        {error, Reason, Ctx} ->
+            {error, {invalid_yaml_config, Reason, Ctx}}
+    end.
 
 -spec format_error(error_reason()) -> string().
 format_error({unsupported_application, App}) ->
     "Erlang application '" ++ atom_to_list(App) ++ "' doesn't support YAML configuration";
-format_error({invalid_config, {bad_enum, Known, Bad}, Ctx}) ->
+format_error({invalid_yaml_config, {bad_enum, Known, Bad}, Ctx}) ->
     format_ctx(Ctx) ++
         format("Unexpected value: ~s. Did you mean '~s'? ~s",
                [Bad, best_match(Bad, Known),
                 format_known("Possible values", Known)]);
-format_error({invalid_config, {unknown_option, Known, Opt}, Ctx}) ->
+format_error({invalid_yaml_config, {unknown_option, Known, Opt}, Ctx}) ->
     format_ctx(Ctx) ++
         format("Unknown parameter: ~s. Did you mean '~s'? ~s",
                [Opt, best_match(Opt, Known),
                 format_known("Available parameters", Known)]);
-format_error({invalid_config, Reason, Ctx}) ->
+format_error({invalid_yaml_config, Reason, Ctx}) ->
     yval:format_error(Reason, Ctx);
 format_error({bad_yaml, Reason}) ->
     fast_yaml:format_error(Reason).
@@ -93,8 +90,13 @@ create_validators(AppOpts) ->
               Mod = callback_module(App),
               case code:ensure_loaded(Mod) of
                   {module, Mod} ->
-                      Validator = Mod:validator(),
-                      {ok, Acc#{App => Validator}};
+                      case erlang:function_exported(Mod, validator, 0) of
+                          true ->
+                              Validator = Mod:validator(),
+                              {ok, Acc#{App => Validator}};
+                          false ->
+                              {error, {unsupported_application, App}}
+                      end;
                   _ ->
                       {error, {unsupported_application, App}}
               end;
@@ -108,17 +110,6 @@ top_validator() ->
 -spec callback_module(atom()) -> module().
 callback_module(App) ->
     list_to_atom(atom_to_list(App) ++ "_yaml").
-
--spec expand_env(unicode:chardata()) -> unicode:chardata().
-expand_env(<<$$, _/binary>> = Env) ->
-    expand_env(binary_to_list(Env));
-expand_env([$$|Env]) ->
-    case os:getenv(Env) of
-        false -> [$$|Env];
-        Value -> Value
-    end;
-expand_env(Other) ->
-    Other.
 
 %%%===================================================================
 %%% Formatters

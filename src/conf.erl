@@ -23,16 +23,19 @@
 -export([stop/0]).
 -export([load_file/1]).
 -export([reload_file/0]).
+-export([reload_file/1]).
+-export([load/1]).
+-export([reload/1]).
 -export([get_path/0]).
 -export([format_error/1]).
 %% Application callbacks
 -export([start/2, stop/1, config_change/3]).
--export_type([error_reason/0]).
+-export_type([error_reason/0, apps_config/0]).
 
 -type error_reason() :: {undefined_env, atom()} |
                         {invalid_env, atom(), term()} |
-                        conf_file:error_reason().
-
+                        conf_yaml_backend:error_reason().
+-type apps_config() :: [{atom(), #{atom() => term()} | {atom(), term()}}].
 -callback validator() -> yval:validator().
 
 %%%===================================================================
@@ -40,24 +43,36 @@
 %%%===================================================================
 -spec load_file(file:filename_all()) -> ok | {error, error_reason()}.
 load_file(Path0) ->
-    Path = conf_file:expand_path(Path0),
+    Path = expand_path(Path0),
     read_and_load_file(Path, false).
 
 -spec reload_file() -> ok | {error, error_reason()}.
 reload_file() ->
     case get_env_file() of
-        {ok, Path0} ->
-            Path = conf_file:expand_path(Path0),
-            read_and_load_file(Path, true);
+        {ok, Path} ->
+            reload_file(Path);
         {error, _} = Err ->
             Err
     end.
+
+-spec reload_file(file:filename_all()) -> ok | {error, error_reason()}.
+reload_file(Path0) ->
+    Path = expand_path(Path0),
+    read_and_load_file(Path, true).
+
+-spec load(term()) -> ok | {error, error_reason()}.
+load(Y) ->
+    load(Y, false).
+
+-spec reload(term()) -> ok | {error, error_reason()}.
+reload(Y) ->
+    load(Y, true).
 
 -spec get_path() -> {ok, file:filename_all()} | {error, error_reason()}.
 get_path() ->
     case get_env_file() of
         {ok, Path} ->
-            {ok, conf_file:expand_path(Path)};
+            {ok, expand_path(Path)};
         {error, _} = Err ->
             Err
     end.
@@ -71,7 +86,7 @@ format_error({invalid_env, Env, Val}) ->
         "Invalid value of Erlang environment variable '~s': ~p",
         [Env, Val]));
 format_error(Reason) ->
-    conf_file:format_error(Reason).
+    conf_yaml_backend:format_error(Reason).
 
 -spec start() -> ok | {error, term()}.
 start() ->
@@ -92,7 +107,7 @@ stop() ->
 start(_StartType, _StartArgs) ->
     case get_env_file() of
         {ok, Path0} ->
-            Path = conf_file:expand_path(Path0),
+            Path = expand_path(Path0),
             case read_and_load_file(Path, false) of
                 ok ->
                     conf_sup:start_link();
@@ -124,14 +139,23 @@ config_change(_Changed, _New, _Removed) ->
 %%%===================================================================
 -spec read_and_load_file(file:filename_all(), boolean()) -> ok | {error, error_reason()}.
 read_and_load_file(Path, Reload) ->
-    case conf_file:read_file(Path) of
+    case conf_yaml_backend:read_file(Path) of
+        {ok, Y} ->
+            load(Y, Reload);
+        {error, _} = Err ->
+            Err
+    end.
+
+-spec load(term(), boolean()) -> ok | {error, error_reason()}.
+load(Y, Reload) ->
+    case conf_yaml_backend:validate(Y) of
         {ok, Config} ->
             load_config(Config, Reload);
         {error, _} = Err ->
             Err
     end.
 
--spec load_config(conf_file:apps_config(), boolean()) -> ok.
+-spec load_config(apps_config(), boolean()) -> ok.
 load_config(Config, Reload) ->
     NewConfig = lists:map(
                   fun({App, Opts}) when is_map(Opts) ->
@@ -181,3 +205,20 @@ get_env_file() ->
         undefined ->
             {error, {undefined_env, file}}
     end.
+
+-spec expand_path(file:filename_all()) -> file:filename_all().
+expand_path(Path) ->
+    filename:absname(
+      filename:join(
+        lists:map(fun expand_env/1, filename:split(Path)))).
+
+-spec expand_env(unicode:chardata()) -> unicode:chardata().
+expand_env(<<$$, _/binary>> = Env) ->
+    expand_env(binary_to_list(Env));
+expand_env([$$|Env]) ->
+    case os:getenv(Env) of
+        false -> [$$|Env];
+        Value -> Value
+    end;
+expand_env(Other) ->
+    Other.
