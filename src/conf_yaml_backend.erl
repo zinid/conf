@@ -69,6 +69,9 @@ format_error({invalid_yaml_config, {bad_enum, Known, Bad}, Ctx}) ->
         format("Unexpected value: ~s. Did you mean '~s'? ~s",
                [Bad, best_match(Bad, Known),
                 format_known("Possible values", Known)]);
+format_error({invalid_yaml_config, {unknown_option, [], Opt}, Ctx}) ->
+    format_ctx(Ctx) ++
+        format("Unknown parameter: ~s. There are no available parameters", [Opt]);
 format_error({invalid_yaml_config, {unknown_option, Known, Opt}, Ctx}) ->
     format_ctx(Ctx) ++
         format("Unknown parameter: ~s. Did you mean '~s'? ~s",
