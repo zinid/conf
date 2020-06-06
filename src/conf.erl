@@ -115,13 +115,13 @@ start(_StartType, _StartArgs) ->
                     logger:critical(
                       "Failed to load configuration from ~ts: ~ts",
                       [Path, format_error(Reason)]),
-                    Err
+                    do_stop(Err)
             end;
         {error, {undefined_env, _}} ->
             conf_sup:start_link();
         {error, Reason} = Err ->
             logger:critical("~s", [format_error(Reason)]),
-            Err
+            do_stop(Err)
     end.
 
 -spec stop(term()) -> ok.
@@ -205,6 +205,26 @@ get_env_file() ->
         undefined ->
             {error, {undefined_env, file}}
     end.
+
+-spec do_stop({error, term()}) -> {error, term()}.
+do_stop(Err) ->
+    case application:get_env(conf, halt, false) of
+        true ->
+            flush_logger(),
+            halt(1, [{flush, true}]);
+        _ ->
+            Err
+    end.
+
+-spec flush_logger() -> ok.
+flush_logger() ->
+    lists:foreach(
+      fun(#{id := Name, module := Mod}) ->
+              case erlang:function_exported(Mod, filesync, 1) of
+                  true -> Mod:filesync(Name);
+                  false -> ok
+              end
+      end, logger:get_handler_config()).
 
 -spec expand_path(file:filename_all()) -> file:filename_all().
 expand_path(Path) ->
