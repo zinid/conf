@@ -207,11 +207,11 @@ get_env_file() ->
     end.
 
 -spec do_stop({error, term()}) -> {error, term()}.
-do_stop(Err) ->
+do_stop({error, Reason} = Err) ->
     case application:get_env(conf, halt, false) of
         true ->
             flush_logger(),
-            halt(1, [{flush, true}]);
+            halt(format_error(Reason), [{flush, true}]);
         _ ->
             Err
     end.
