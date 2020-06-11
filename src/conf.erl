@@ -237,7 +237,7 @@ expand_env(<<$$, _/binary>> = Env) ->
     expand_env(binary_to_list(Env));
 expand_env([$$|Env]) ->
     case os:getenv(Env) of
-        false -> [$$|Env];
+        false -> "";
         Value -> Value
     end;
 expand_env(Other) ->
