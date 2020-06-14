@@ -217,7 +217,7 @@ do_stop({error, Reason} = Err) ->
                          crash -> format_error(Reason);
                          _Halt -> 1
                      end,
-            halt(Status, [{flush, true}])
+            halt(Status)
     end.
 
 -spec flush_logger() -> ok.
