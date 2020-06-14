@@ -208,12 +208,16 @@ get_env_file() ->
 
 -spec do_stop({error, term()}) -> {error, term()}.
 do_stop({error, Reason} = Err) ->
-    case application:get_env(conf, halt, false) of
-        true ->
+    case application:get_env(conf, on_fail, stop) of
+        stop ->
+            Err;
+        OnFail ->
             flush_logger(),
-            halt(format_error(Reason), [{flush, true}]);
-        _ ->
-            Err
+            Status = case OnFail of
+                         crash -> format_error(Reason);
+                         _Halt -> 1
+                     end,
+            halt(Status, [{flush, true}])
     end.
 
 -spec flush_logger() -> ok.
