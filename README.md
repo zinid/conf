@@ -106,6 +106,8 @@ the `Reason` in a human readable format:
 
 ## Dependencies
 
+Erlang >= 21.3
+
 `conf` application relies heavily on [yval](https://github.com/zinid/yval)
 application, so refer to its documentation for detailed information on how to write
 YAML validators.
