@@ -157,18 +157,12 @@ load(Y, Reload) ->
 
 -spec load_config(apps_config(), boolean()) -> ok.
 load_config(Config, Reload) ->
-    NewConfig = lists:map(
-                  fun({App, Opts}) when is_map(Opts) ->
-                          {App, maps:to_list(Opts)};
-                     ({App, Opts}) when is_list(Opts) ->
-                          {App, Opts}
-                  end, Config),
     case Reload of
         false ->
-            application:set_env(NewConfig, [{persistent, true}]);
+            set_env(Config);
         true ->
             OldConfig = application_controller:prep_config_change(),
-            application:set_env(NewConfig, [{persistent, true}]),
+            set_env(Config),
             case application_controller:config_change(OldConfig) of
                 ok ->
                     ok;
@@ -176,6 +170,32 @@ load_config(Config, Reload) ->
                     report_config_change_errors(Errors)
             end
     end.
+
+-spec set_env(apps_config()) -> ok.
+-ifdef(old_set_env). % Erlang/OTP < 21.3.
+set_env(Config) ->
+    lists:foreach(
+      fun({App, Opts}) when is_map(Opts) ->
+              maps:fold(
+                fun(Par, Val, ok) ->
+                        application:set_env(App, Par, Val, [{persistent, true}])
+                end, ok, Opts);
+         ({App, Opts}) when is_list(Opts) ->
+              lists:foreach(
+                fun({Par, Val}) ->
+                        application:set_env(App, Par, Val, [{persistent, true}])
+                end, Opts)
+      end, Config).
+-else.
+set_env(Config) ->
+    NewConfig = lists:map(
+                  fun({App, Opts}) when is_map(Opts) ->
+                          {App, maps:to_list(Opts)};
+                     ({App, Opts}) when is_list(Opts) ->
+                          {App, Opts}
+                  end, Config),
+    application:set_env(NewConfig, [{persistent, true}]).
+-endif.
 
 -spec report_config_change_errors(term()) -> ok.
 report_config_change_errors(Errors) when is_list(Errors) ->
