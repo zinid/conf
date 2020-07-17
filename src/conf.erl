@@ -36,12 +36,13 @@
                         {invalid_env, atom(), term()} |
                         conf_yaml_backend:error_reason().
 -type apps_config() :: [{atom(), #{atom() => term()} | {atom(), term()}}].
+-type path() :: file:filename_all() | uri_string:uri_string().
 -callback validator() -> yval:validator().
 
 %%%===================================================================
 %%% API
 %%%===================================================================
--spec load_file(file:filename_all()) -> ok | {error, error_reason()}.
+-spec load_file(path()) -> ok | {error, error_reason()}.
 load_file(Path0) ->
     Path = expand_path(Path0),
     read_and_load_file(Path, false).
@@ -55,7 +56,7 @@ reload_file() ->
             Err
     end.
 
--spec reload_file(file:filename_all()) -> ok | {error, error_reason()}.
+-spec reload_file(path()) -> ok | {error, error_reason()}.
 reload_file(Path0) ->
     Path = expand_path(Path0),
     read_and_load_file(Path, true).
@@ -68,7 +69,7 @@ load(Y) ->
 reload(Y) ->
     load(Y, true).
 
--spec get_path() -> {ok, file:filename_all()} | {error, error_reason()}.
+-spec get_path() -> {ok, path()} | {error, error_reason()}.
 get_path() ->
     case get_env_file() of
         {ok, Path} ->
@@ -137,7 +138,7 @@ config_change(_Changed, _New, _Removed) ->
 %%%===================================================================
 %%% Internal functions
 %%%===================================================================
--spec read_and_load_file(file:filename_all(), boolean()) -> ok | {error, error_reason()}.
+-spec read_and_load_file(path(), boolean()) -> ok | {error, error_reason()}.
 read_and_load_file(Path, Reload) ->
     case conf_yaml_backend:read_file(Path) of
         {ok, Y} ->
@@ -250,7 +251,13 @@ flush_logger() ->
               end
       end, logger:get_handler_config()).
 
--spec expand_path(file:filename_all()) -> file:filename_all().
+-spec expand_path(path()) -> path().
+expand_path("http://" ++ _ = URI) -> URI;
+expand_path(<<"http://", _/binary>> = URI) -> URI;
+expand_path("https://" ++ _ = URI) -> URI;
+expand_path(<<"https://", _/binary>> = URI) -> URI;
+expand_path("file://" ++ Path) -> expand_path(Path);
+expand_path(<<"file://", Path/binary>>) -> expand_path(Path);
 expand_path(Path) ->
     filename:absname(
       filename:join(
