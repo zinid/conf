@@ -15,33 +15,39 @@
 %%%
 %%%-------------------------------------------------------------------
 -module(conf_yaml_backend).
+-behaviour(conf_backend).
 
 %% API
--export([read_file/1]).
+-export([decode/1]).
 -export([validate/1]).
+-export([mime_types/0]).
 -export([format_error/1]).
 -export_type([error_reason/0]).
 
+-type yaml() :: term(). %% TODO: must be fast_yaml:yaml(), but it's not exported
+-type yaml_error_reason() :: {bad_yaml, term()}.
 -type error_reason() :: {unsupported_application, atom()} |
                         {invalid_yaml_config, yval:error_reason(), yval:ctx()} |
-                        {bad_yaml, term()} |
-                        {file, file:posix()} |
-                        {http, conf_http:error_reason()}.
--type path() :: file:filename_all() | uri_string:uri_string().
--type ref() :: binary() | uri_string:uri_map().
+                        {bad_ref, binary(), yaml_error_reason() | conf_file:error_reason()} |
+                        {circular_ref, binary()} |
+                        yaml_error_reason().
 -type distance_cache() :: #{{string(), string()} => non_neg_integer()}.
 
 %%%===================================================================
-%%% API
+%%% conf_backend callbacks
 %%%===================================================================
--spec read_file(path()) -> {ok, term()} | {error, error_reason()}.
-read_file(Path) ->
-    case yval:validate(ref_validator(), iolist_to_binary(Path)) of
-        {ok, Ref} -> read_ref(Ref);
-        {error, Reason, _} -> {error, {invalid_yaml_config, Reason, []}}
+-spec decode(iodata()) -> {ok, yaml()} | {error, error_reason()}.
+decode(Data) ->
+    case fast_yaml:decode(Data) of
+        {ok, [Y]} ->
+            {ok, Y};
+        {ok, []} ->
+            {ok, []};
+        {error, Reason} ->
+            {error, {bad_yaml, Reason}}
     end.
 
--spec validate(term()) -> {ok, conf:apps_config()} | {error, error_reason()}.
+-spec validate(yaml()) -> {ok, conf:apps_config()} | {error, error_reason()}.
 validate(Y0) ->
     try yval:validate(refs_validator(), Y0) of
         {ok, Y} ->
@@ -64,9 +70,15 @@ validate(Y0) ->
             end;
         {error, Reason, Ctx} ->
             {error, {invalid_yaml_config, Reason, Ctx}}
-    catch _:{?MODULE, Reason, Ctx} ->
-            {error, {invalid_yaml_config, Reason, Ctx}}
+    catch _:{?MODULE, Reason, _Ctx} ->
+            {error, Reason}
     end.
+
+-spec mime_types() -> [binary(), ...].
+mime_types() ->
+    [<<"application/json">>, <<"application/yaml">>,
+     <<"application/x-yaml">>, <<"application/octet-stream">>,
+     <<"text/x-yaml">>, <<"text/plain">>].
 
 -spec format_error(error_reason()) -> unicode:chardata().
 format_error({unsupported_application, App}) ->
@@ -84,27 +96,20 @@ format_error({invalid_yaml_config, {unknown_option, Known, Opt}, Ctx}) ->
         format("Unknown parameter: ~s. Did you mean '~s'? ~s",
                [Opt, best_match(Opt, Known),
                 format_known("Available parameters", Known)]);
-format_error({invalid_yaml_config, {bad_ref, Ref, Reason}, Ctx}) ->
-    format_ctx(Ctx) ++
-        format("Failed to read from ~ts: ~s", [Ref, format_error(Reason)]);
-format_error({invalid_yaml_config, {circular_ref, Ref}, Ctx}) ->
-    format_ctx(Ctx) ++
-        format("Circularly defined reference: ~ts", [Ref]);
-format_error({invalid_yaml_config, {depth_limit, Limit}, _}) ->
-    format("Depth limit reached: ~B", [Limit]);
 format_error({invalid_yaml_config, Reason, Ctx}) ->
     yval:format_error(Reason, Ctx);
-format_error({http, Reason}) ->
-    conf_http:format_error(Reason);
-format_error({file, Reason}) ->
-    case file:format_error(Reason) of
-        "unknown POSIX error" ->
-            atom_to_list(Reason);
-        Text ->
-            Text
-    end;
+format_error({depth_limit, Limit}) ->
+    format("Depth limit reached: ~B", [Limit]);
+format_error({bad_ref, Ref, Reason}) ->
+    format("Failed to read from ~ts: ~s",
+           [Ref, case Reason of
+                     {bad_yaml, _} -> format_error(Reason);
+                     _ -> conf_file:format_error(Reason)
+                 end]);
+format_error({circular_ref, Ref}) ->
+    format("Circularly defined reference: ~ts", [Ref]);
 format_error({bad_yaml, Reason}) ->
-    fast_yaml:format_error(Reason).
+    "Malformed YAML: " ++ fast_yaml:format_error(Reason).
 
 %%%===================================================================
 %%% Internal functions
@@ -150,21 +155,26 @@ refs_validator(Limit = 100, _) ->
 refs_validator(Level, Paths) ->
     fun([{_, _}|_] = Y) ->
             lists:flatmap(
-              fun({Key, Val}) when Key == <<"$ref">>; Key == '$ref' ->
-                      Ref = (ref_validator())(Val),
-                      Path = format_ref(Ref),
-                      case lists:member(Path, Paths) of
-                          true ->
-                              yval:fail(?MODULE, {circular_ref, Path});
-                          false ->
-                              case read_ref(Ref) of
-                                  {ok, IncludeY} ->
-                                      (yval:and_then(
-                                         yval:map(yval:any(), yval:any()),
-                                         (refs_validator(Level+1, [Path|Paths]))))(IncludeY);
-                                  {error, Reason} ->
-                                      yval:fail(?MODULE, {bad_ref, Path, Reason})
-                              end
+              fun({Key, Val}) when Key == <<"$ref">> orelse Key == '$ref' ->
+                      Path = (yval:non_empty(yval:binary()))(Val),
+                      case conf_file:path_to_ref(Path) of
+                          {ok, Ref} ->
+                              Path0 = conf_file:format_ref(Ref),
+                              case lists:member(Path0, Paths) of
+                                  true ->
+                                      yval:fail(?MODULE, {circular_ref, Path0});
+                                  false ->
+                                      case read_ref(Ref) of
+                                          {ok, IncludeY} ->
+                                              (yval:and_then(
+                                                 yval:map(yval:any(), yval:any()),
+                                                 (refs_validator(Level+1, [Path0|Paths]))))(IncludeY);
+                                          {error, Reason} ->
+                                              yval:fail(?MODULE, {bad_ref, Path0, Reason})
+                                      end
+                              end;
+                          {error, Reason} ->
+                              yval:fail(?MODULE, {bad_ref, Path, Reason})
                       end;
                  ({Key, Val}) ->
                       [{Key, (refs_validator(Level+1, Paths))(Val)}]
@@ -175,41 +185,13 @@ refs_validator(Level, Paths) ->
             Y
     end.
 
--spec ref_validator() -> yval:validator(ref()).
-ref_validator() ->
-    yval:and_then(
-      yval:binary(),
-      fun(B) ->
-              case uri_string:parse(B) of
-                  #{scheme := Scheme} = URI when Scheme /= <<>> ->
-                      _ = (yval:url([http]))(B),
-                      URI;
-                  _ ->
-                      (yval:path())(B)
-              end
-      end).
-
--spec read_ref(ref()) -> {ok, term()} | {error, error_reason()}.
-read_ref(#{} = URI) ->
-    case conf_http:get(URI) of
-        {ok, Data} -> yaml_decode(Data);
-        {error, Reason} -> {error, {http, Reason}}
-    end;
-read_ref(Path) ->
-    case file:read_file(Path) of
-        {ok, Data} -> yaml_decode(Data);
-        {error, Reason} -> {error, {file, Reason}}
-    end.
-
--spec yaml_decode(iodata()) -> {ok, term()} | {error, {bad_yaml, term()}}.
-yaml_decode(Data) ->
-    case fast_yaml:decode(Data) of
-        {ok, [Y]} ->
-            {ok, Y};
-        {ok, []} ->
-            {ok, []};
-        {error, Reason} ->
-            {error, {bad_yaml, Reason}}
+-spec read_ref(conf_file:ref()) -> {ok, yaml()} |
+                                   {error, yaml_error_reason()} |
+                                   {error, conf_file:error_reason()}.
+read_ref(Ref) ->
+    case conf_file:read(Ref, mime_types()) of
+        {ok, Data} -> decode(Data);
+        {error, _} = Err -> Err
     end.
 
 %%%===================================================================
@@ -237,12 +219,6 @@ format_join([]) ->
 format_join(L) ->
     Strings = lists:map(fun to_string/1, L),
     lists:join(", ", lists:sort(Strings)).
-
--spec format_ref(ref()) -> iodata().
-format_ref(#{} = URI) ->
-    uri_string:normalize(URI);
-format_ref(Path) ->
-    Path.
 
 -spec best_match(atom() | binary() | string(),
                  [atom() | binary() | string()]) -> string().
