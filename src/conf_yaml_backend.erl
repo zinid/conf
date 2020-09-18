@@ -166,9 +166,7 @@ refs_validator(Level, Paths) ->
                                   false ->
                                       case read_ref(Ref) of
                                           {ok, IncludeY} ->
-                                              (yval:and_then(
-                                                 yval:map(yval:any(), yval:any()),
-                                                 (refs_validator(Level+1, [Path0|Paths]))))(IncludeY);
+                                              (refs_validator(Level+1, [Path0|Paths]))(IncludeY);
                                           {error, Reason} ->
                                               yval:fail(?MODULE, {bad_ref, Path0, Reason})
                                       end
