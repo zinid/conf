@@ -23,9 +23,15 @@
 -export([to_string/1]).
 -export([to_seconds/1]).
 -export([to_minutes/1]).
+-export([try_load/3]).
+-export([format_error/1]).
+-export_type([error_reason/0]).
 %% Imported validators
 -import(yval, [bool/0, enum/1, options/2, atom/0, and_then/2, either/2,
                pos_int/0, timeout/1, beam/1, list/1, term/0, any/0]).
+
+-type error_reason() :: {function_not_exported, module(), atom(), non_neg_integer()} |
+                        {module_not_found, module()}.
 
 %%%===================================================================
 %%% API
@@ -122,6 +128,28 @@ file_modes_validator() ->
                 end, Modes)
       end).
 
+-spec try_load(module(), atom(), non_neg_integer()) ->
+                      {ok, module()} | {error, error_reason()}.
+try_load(Mod, Fun, Arity) ->
+    case code:ensure_loaded(Mod) of
+        {module, Mod} ->
+            case erlang:function_exported(Mod, Fun, Arity) of
+                true -> {ok, Mod};
+                false -> {error, {function_not_exported, Mod, Fun, Arity}}
+            end;
+        _ ->
+            {error, {module_not_found, Mod}}
+    end.
+
+-spec format_error(error_reason()) -> unicode:chardata().
+format_error({function_not_exported, Mod, Fun, Arity}) ->
+    format("Erlang module '~s' doesn't export ~s/~B", [Mod, Fun, Arity]);
+format_error({module_not_found, Mod}) ->
+    format("Couldn't find Erlang module '~s'", [Mod]).
+
 %%%===================================================================
 %%% Internal functions
 %%%===================================================================
+-spec format(iodata(), list()) -> string().
+format(Fmt, Args) ->
+    lists:flatten(io_lib:format(Fmt, Args)).
