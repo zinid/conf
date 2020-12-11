@@ -29,6 +29,8 @@
 -type error_reason() :: {unsupported_application, atom()} |
                         {invalid_yaml_config, yval:error_reason(), yval:ctx()} |
                         {bad_ref, binary(), yaml_error_reason() | conf_file:error_reason()} |
+                        {bad_env, conf:error_reason()} |
+                        {bad_mod, conf_misc:error_reason()} |
                         {circular_ref, binary()} |
                         yaml_error_reason().
 -type distance_cache() :: #{{string(), string()} => non_neg_integer()}.
@@ -109,7 +111,11 @@ format_error({bad_ref, Ref, Reason}) ->
 format_error({circular_ref, Ref}) ->
     format("Circularly defined reference: ~ts", [Ref]);
 format_error({bad_yaml, Reason}) ->
-    "Malformed YAML: " ++ fast_yaml:format_error(Reason).
+    "Malformed YAML: " ++ fast_yaml:format_error(Reason);
+format_error({bad_env, Reason}) ->
+    conf_env:format_error(Reason);
+format_error({bad_mod, Reason}) ->
+    conf_misc:format_error(Reason).
 
 %%%===================================================================
 %%% Internal functions
@@ -119,18 +125,12 @@ format_error({bad_yaml, Reason}) ->
 create_validators(AppOpts) ->
     lists:foldl(
       fun({App, _Opts}, {ok, Acc}) ->
-              Mod = callback_module(App),
-              case code:ensure_loaded(Mod) of
-                  {module, Mod} ->
-                      case erlang:function_exported(Mod, validator, 0) of
-                          true ->
-                              Validator = Mod:validator(),
-                              {ok, Acc#{App => Validator}};
-                          false ->
-                              {error, {unsupported_application, App}}
-                      end;
-                  _ ->
-                      {error, {unsupported_application, App}}
+              case callback_module(App) of
+                  {ok, Mod} ->
+                      Validator = Mod:validator(),
+                      {ok, Acc#{App => Validator}};
+                  {error, _} = Err ->
+                      Err
               end;
          (_, {error, _} = Err) ->
               Err
@@ -139,9 +139,27 @@ create_validators(AppOpts) ->
 top_validator() ->
     yval:map(yval:atom(), yval:any(), [unique]).
 
--spec callback_module(atom()) -> module().
+-spec callback_module(atom()) -> {ok, module()} | {error, error_reason()}.
 callback_module(App) ->
-    list_to_atom(atom_to_list(App) ++ "_yaml").
+    case conf_env:callback_module(App) of
+        {ok, Mod} ->
+            case conf_misc:try_load(Mod, validator, 0) of
+                {ok, _} = OK ->
+                    OK;
+                {error, Reason} ->
+                    {error, {bad_mod, Reason}}
+            end;
+        {error, {undefined_env, _}} ->
+            Mod = list_to_atom(atom_to_list(App) ++ "_yaml"),
+            case conf_misc:try_load(Mod, validator, 0) of
+                {ok, _} = OK ->
+                    OK;
+                {error, _} ->
+                    {error, {unsupported_application, App}}
+            end;
+        {error, Reason} ->
+            {error, {bad_env, Reason}}
+    end.
 
 -spec refs_validator() -> yval:validator().
 refs_validator() ->

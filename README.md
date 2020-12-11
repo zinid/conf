@@ -117,6 +117,13 @@ parser.
 
 In order to define YAML configuration for your application `my_app`, you should
 create file `my_app_yaml.erl` inside your source directory (typically `src`).
+If you don't like the convention with `_yaml` suffix, you can set the module's
+name explicitly in the environment variable `callback_yaml`:
+```erl
+[
+ {conf, [{callback_yaml, [{my_app, my_config_validator}]}]}
+].
+```
 The `conf` behaviour requires `validator/0` callback to be provided,
 so your module `my_app` must define `validator/0` callback, that must return
 `yval:options/2` validator. The parameters for `yval:options/2` validator
