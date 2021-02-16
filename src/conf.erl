@@ -113,7 +113,7 @@ start(_StartType, _StartArgs) ->
                 {error, Reason} = Err ->
                     logger:critical(
                       "Failed to load configuration from ~ts: ~ts",
-                      [Path, format_error(Reason)]),
+                      [conf_file:format_ref(Path), format_error(Reason)]),
                     do_stop(Err)
             end;
         {error, {undefined_env, _}} ->
