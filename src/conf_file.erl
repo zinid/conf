@@ -77,8 +77,13 @@ format_error({http, Reason}) ->
 -spec format_ref(ref()) -> binary().
 format_ref(#{} = URI) ->
     uri_string:normalize(URI);
-format_ref(Path) ->
-    Path.
+format_ref(Path0) ->
+    case expand_path(Path0) of
+        {ok, Path} ->
+            Path;
+        {error, _Reason} ->
+            Path0
+    end.
 
 %%%===================================================================
 %%% Internal functions
