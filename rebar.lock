@@ -6,7 +6,7 @@
  {<<"p1_utils">>,{pkg,<<"p1_utils">>,<<"1.0.17">>},1},
  {<<"yval">>,
   {git,"https://github.com/zinid/yval.git",
-       {ref,"432902afcb48a4d6b568893a9831dd504626b133"}},
+       {ref,"8da69d015661c7501c39c80a69cd9ecdb2f70bb3"}},
   0}]}.
 [
 {pkg_hash,[
